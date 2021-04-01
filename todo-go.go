@@ -1,7 +1,6 @@
 package main
 
 import (
-	"container/list"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -10,68 +9,58 @@ import (
 	"github.com/gotk3/gotk3/gtk"
 )
 
-var labelList = list.New()
-var config_file = "data.json"
+type App struct {
+	config_file string
+	datalist    []data
+	labellist   []*gtk.Label
+	labelsGrid  *gtk.Grid
+}
 
-// var data = make(map[string]string)
-type data_ struct {
+type data struct {
 	Date  string
 	Label string
 }
 
-// Field int `json:"myName"`
-var data_list = []data_{}
-
 func main() {
+	app := App{config_file: "data.json"}
+	app.run()
+}
+func (main *App) run() {
 	gtk.Init(nil)
-
 	win, err := gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
 	if err != nil {
 		log.Fatal("Unable to create window:", err)
 	}
 	win.SetTitle("ToDo")
 	win.Connect("destroy", func() {
-		save_data()
+		main.save_data()
 		gtk.MainQuit()
 	})
-	get_data()
-	win.Add(windowWidget())
+	main.get_data()
+	win.Add(main.windowWidget())
 	win.ShowAll()
-
 	gtk.Main()
 }
-
-func windowWidget() *gtk.Widget {
+func (main *App) windowWidget() *gtk.Widget {
 	grid, err := gtk.GridNew()
 	if err != nil {
 		log.Fatal("Unable to create grid:", err)
 	}
 	grid.SetOrientation(gtk.ORIENTATION_VERTICAL)
-
-	unused, err := gtk.LabelNew("This label is never used")
-	if err != nil {
-
-		unused.Destroy()
-	}
-
 	sw, err := gtk.ScrolledWindowNew(nil, nil)
 	if err != nil {
 		log.Fatal("Unable to create scrolled window:", err)
 	}
-
 	grid.Attach(sw, 0, 0, 2, 1)
 	sw.SetHExpand(true)
 	sw.SetVExpand(true)
-
-	labelsGrid, err := gtk.GridNew()
+	main.labelsGrid, err = gtk.GridNew()
 	if err != nil {
 		log.Fatal("Unable to create grid:", err)
 	}
-	labelsGrid.SetOrientation(gtk.ORIENTATION_VERTICAL)
-
-	sw.Add(labelsGrid)
-	labelsGrid.SetHExpand(true)
-
+	main.labelsGrid.SetOrientation(gtk.ORIENTATION_VERTICAL)
+	sw.Add(main.labelsGrid)
+	main.labelsGrid.SetHExpand(true)
 	insertBtn, err := gtk.ButtonNewWithLabel("Add a label")
 	if err != nil {
 		log.Fatal("Unable to create button:", err)
@@ -80,41 +69,33 @@ func windowWidget() *gtk.Widget {
 	if err != nil {
 		log.Fatal("Unable to create button:", err)
 	}
-
 	insertBtn.Connect("clicked", func() {
-		new_todo()
-
+		main.new_todo()
 	})
-
 	removeBtn.Connect("clicked", func() {
-		rm_todo()
+		main.rm_todo()
 	})
-	for _, data := range data_list {
+	for _, data := range main.datalist {
 		newlabel, err := gtk.LabelNew(fmt.Sprint("Date : ", data.Date, "\t Label : ", data.Label))
 		if err != nil {
 			log.Print("Unable to create label:", err)
 		}
-
-		labelList.PushBack(newlabel)
-		labelsGrid.Add(newlabel)
+		main.labelsGrid.Add(newlabel)
+		main.labellist = append(main.labellist, newlabel)
 		newlabel.SetHExpand(true)
-		labelsGrid.ShowAll()
-
+		main.labelsGrid.ShowAll()
 	}
 	grid.Attach(insertBtn, 0, 1, 1, 1)
 	grid.Attach(removeBtn, 1, 1, 1, 1)
-
 	return &grid.Container.Widget
 }
-func new_todo() {
+func (main *App) new_todo() {
 	win, err := gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
 	if err != nil {
 		log.Fatal("Unable to create window:", err)
 	}
 	win.SetTitle("ToDo")
 	win.Connect("destroy", func() {
-		// save_data()
-		// gtk.MainQuit()
 		win.Destroy()
 	})
 	labelsGrid, err := gtk.GridNew()
@@ -122,9 +103,6 @@ func new_todo() {
 		log.Fatal("Unable to create grid:", err)
 	}
 	labelsGrid.SetOrientation(gtk.ORIENTATION_VERTICAL)
-	a, e := gtk.LabelNew("Hello World")
-	fmt.Println(e)
-	labelsGrid.Add(a)
 	entry_buffer, err := gtk.EntryBufferNew("Enter Date", 10)
 	check_err(err)
 	entry_date, err := gtk.EntryNewWithBuffer(entry_buffer)
@@ -142,28 +120,27 @@ func new_todo() {
 		check_err(err)
 		label, err := entry_buffer2.GetText()
 		check_err(err)
-		new_data := data_{date, label}
-		data_list = append(data_list, new_data)
+		new_data := data{date, label}
+		main.datalist = append(main.datalist, new_data)
+		main.restart()
 	})
 	labelsGrid.Add(entry_label)
 	labelsGrid.Add(insertBtn)
+
 	win.Add(labelsGrid)
 	win.ShowAll()
-	// win.Destroy()
 }
-func rm_todo() {
+func (main *App) rm_todo() {
 	win, err := gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
 	check_err(err)
 	grid, err := gtk.GridNew()
 	check_err(err)
 	grid.SetOrientation(gtk.ORIENTATION_VERTICAL)
 	list_box, err := gtk.ListBoxNew()
-	// list_box.SetSelectionMode(gtk.SELECTION_MULTIPLE)
 	check_err(err)
-	for i, data := range data_list {
+	for i, data := range main.datalist {
 		newlabel, err := gtk.LabelNew(fmt.Sprint("Date : ", data.Date, "\t Label : ", data.Label))
 		check_err(err)
-		labelList.PushBack(newlabel)
 		list_box.Insert(newlabel, i)
 	}
 	rm_button, err := gtk.ButtonNewWithLabel("Remove")
@@ -173,12 +150,11 @@ func rm_todo() {
 		list := list_box.GetSelectedRow()
 		index := list.GetIndex()
 		fmt.Print(index)
-		copy(data_list[index:], data_list[index+1:]) // Shift a[i+1:] left one index.
-		data_list[len(data_list)-1] = data_{}     // Erase last element (write zero value).
-		data_list = data_list[:len(data_list)-1]    
-		
-	})
+		copy(main.datalist[index:], main.datalist[index+1:]) // Shift a[i+1:] left one index.
+		main.datalist[len(main.datalist)-1] = data{}         // Erase last element (write zero value).
+		main.datalist = main.datalist[:len(main.datalist)-1]
 
+	})
 	grid.Add(list_box)
 	grid.Add(rm_button)
 	win.Connect("destroy", func() {
@@ -187,29 +163,41 @@ func rm_todo() {
 	win.Add(grid)
 	win.ShowAll()
 }
-func get_data() {
-	file_data, err := ioutil.ReadFile(config_file)
+func (main *App) get_data() {
+	file_data, err := ioutil.ReadFile(main.config_file)
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
-	err = json.Unmarshal(file_data, &data_list)
+	err = json.Unmarshal(file_data, &main.datalist)
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
-
 }
-func save_data() {
-	json_data, err := json.Marshal(data_list)
+func (main *App) save_data() {
+	json_data, err := json.Marshal(main.datalist)
 	if err != nil {
 		log.Fatal("Error :", err)
 	}
-	fmt.Println(string(json_data))
-	fmt.Println(config_file)
-	err = ioutil.WriteFile(config_file, json_data, 0777)
+	err = ioutil.WriteFile(main.config_file, json_data, 0777)
 	check_err(err)
+}
+func (main *App) restart() {
+	for _, val := range main.labellist {
+		val.Destroy()
+	}
+	for _, data := range main.datalist {
+		newlabel, err := gtk.LabelNew(fmt.Sprint("Date : ", data.Date, "\t Label : ", data.Label))
+		if err != nil {
+			log.Print("Unable to create label:", err)
+		}
+		main.labelsGrid.Add(newlabel)
+		main.labellist = append(main.labellist, newlabel)
+		newlabel.SetHExpand(true)
+		main.labelsGrid.ShowAll()
+	}
 }
 func check_err(err error) {
 	if err != nil {
-		log.Fatal("Error :", err)
+		log.Fatal("Error :", err.Error())
 	}
 }
